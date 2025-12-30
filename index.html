@@ -179,7 +179,7 @@ window.addEventListener("resize", resize);
 function fitToScreen(){
   const st=stageRect();
   if(!img.complete) return;
-  const pad=0.85; // zoom inicial para ver bien sin franjas blancas
+  const pad=1.05; // zoom inicial al 105%
   const sx=st.width/img.width;
   const sy=st.height/img.height;
   scale=Math.min(sx,sy)*pad;
