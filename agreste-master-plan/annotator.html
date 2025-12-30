@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="es"><head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Marcador de lotes - Agreste</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#fff}
+.wrap{display:grid;grid-template-columns:1fr 420px;height:100vh}
+.stage{background:#ffffff;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+.panel{background:#fff;border-left:1px solid #e7e7e7;padding:14px;overflow:auto}
+select,button{padding:10px;border:1px solid #ddd;border-radius:10px;font-size:14px;width:100%}
+button{background:#fff;cursor:pointer}
+.row{margin:10px 0}
+.muted{color:#6b7280;font-size:12px}
+code{background:#f6f6f6;padding:2px 6px;border-radius:6px}
+</style></head>
+<body>
+<div class="wrap">
+  <div class="stage"><canvas id="c"></canvas></div>
+  <div class="panel">
+    <h2 style="margin:0 0 6px 0">Marcador de lotes</h2>
+    <div class="muted">Click agrega puntos. “Cerrar polígono” lo guarda. “Exportar” descarga <code>lotes.js</code>.</div>
+
+    <div class="row"><label class="muted">Lote</label><select id="lotSelect"></select></div>
+    <div class="row"><label class="muted">Estado</label>
+      <select id="status">
+        <option value="disponible">Disponible</option>
+        <option value="reservado">Reservado</option>
+        <option value="vendido">Vendido</option>
+      </select>
+    </div>
+
+    <div class="row" style="display:flex;gap:8px">
+      <button id="fit" style="flex:1">Ver todo</button>
+      <button id="undo" style="flex:1">Deshacer</button>
+    </div>
+    <div class="row" style="display:flex;gap:8px">
+      <button id="clear" style="flex:1">Borrar</button>
+      <button id="close" style="flex:1">Cerrar polígono</button>
+    </div>
+    <div class="row">
+      <button id="export">Exportar</button>
+    </div>
+
+    <div class="muted">Arrastrar para mover • Rueda para zoom • Polígono mínimo 3 puntos.</div>
+  </div>
+</div>
+
+<script src="lotes.js"></script>
+<script>
+const canvas=document.getElementById("c"), ctx=canvas.getContext("2d");
+const img=new Image(); img.src="masterplan.png";
+let lots=(typeof LOTES!=="undefined")?JSON.parse(JSON.stringify(LOTES)):[];
+let currentId=null;
+let scale=1, offsetX=0, offsetY=0, dragging=false, drag={sx:0,sy:0,ox:0,oy:0};
+
+function stageRect(){ return document.querySelector(".stage").getBoundingClientRect(); }
+
+function resize(){
+  const st=stageRect();
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=Math.floor(st.width*dpr);
+  canvas.height=Math.floor(st.height*dpr);
+  canvas.style.width=st.width+"px";
+  canvas.style.height=st.height+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  draw();
+}
+window.addEventListener("resize",resize);
+
+function fitToScreen(){
+  const st=stageRect();
+  if(!img.complete) return;
+  const pad=0.97;
+  const sx=st.width/img.width, sy=st.height/img.height;
+  scale=Math.min(sx,sy)*pad;
+  offsetX=(st.width - img.width*scale)/2;
+  offsetY=(st.height - img.height*scale)/2;
+  draw();
+}
+
+function toWorld(x,y){return{x:(x-offsetX)/scale,y:(y-offsetY)/scale};}
+
+function drawPoly(poly, fill, stroke, width=2){
+  if(!poly||poly.length<2) return;
+  ctx.beginPath(); poly.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+  ctx.closePath(); if(fill){ctx.fillStyle=fill;ctx.fill();}
+  ctx.strokeStyle=stroke;ctx.lineWidth=width;ctx.stroke();
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!img.complete) return;
+  ctx.save(); ctx.translate(offsetX,offsetY); ctx.scale(scale,scale); ctx.drawImage(img,0,0);
+
+  for(const L of lots){
+    if(L.polygon && L.polygon.length>=3){
+      const isCur=L.id===currentId;
+      drawPoly(L.polygon, isCur?"rgba(59,130,246,0.18)":"rgba(17,24,39,0.06)", isCur?"rgba(17,24,39,0.9)":"rgba(17,24,39,0.25)", isCur?3:2);
+    }
+  }
+  const cur=lots.find(x=>x.id===currentId);
+  if(cur && cur._draft && cur._draft.length){
+    ctx.strokeStyle="rgba(34,197,94,0.9)"; ctx.lineWidth=2;
+    ctx.beginPath(); cur._draft.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)); ctx.stroke();
+    for(const p of cur._draft){ctx.fillStyle="rgba(34,197,94,0.9)"; ctx.beginPath(); ctx.arc(p.x,p.y,4/scale,0,Math.PI*2); ctx.fill();}
+  }
+  ctx.restore();
+}
+
+function ensureDraft(){
+  const cur=lots.find(x=>x.id===currentId);
+  if(!cur._draft) cur._draft=[];
+  return cur;
+}
+
+canvas.addEventListener("click",(e)=>{
+  if(dragging) return;
+  const r=canvas.getBoundingClientRect();
+  const w=toWorld(e.clientX-r.left, e.clientY-r.top);
+  const cur=ensureDraft();
+  cur._draft.push({x:Math.round(w.x), y:Math.round(w.y)});
+  draw();
+});
+canvas.addEventListener("mousedown",(e)=>{dragging=true; drag={sx:e.clientX,sy:e.clientY,ox:offsetX,oy:offsetY};});
+window.addEventListener("mouseup",()=>dragging=false);
+window.addEventListener("mousemove",(e)=>{if(!dragging)return; offsetX=drag.ox+(e.clientX-drag.sx); offsetY=drag.oy+(e.clientY-drag.sy); draw();});
+
+canvas.addEventListener("wheel",(e)=>{
+  e.preventDefault();
+  const r=canvas.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  const before=toWorld(mx,my);
+  const factor=(e.deltaY>0)?0.9:1.1;
+  scale=Math.max(0.2,Math.min(16,scale*factor));
+  const after=toWorld(mx,my);
+  offsetX+=(after.x-before.x)*scale; offsetY+=(after.y-before.y)*scale;
+  draw();
+},{passive:false});
+
+document.getElementById("fit").addEventListener("click", fitToScreen);
+document.getElementById("undo").addEventListener("click",()=>{const cur=ensureDraft();cur._draft.pop();draw();});
+document.getElementById("clear").addEventListener("click",()=>{const cur=ensureDraft();cur._draft=[];cur.polygon=[];cur.label=null;draw();});
+document.getElementById("close").addEventListener("click",()=>{
+  const cur=ensureDraft();
+  if(cur._draft.length>=3){
+    cur.polygon=cur._draft.slice();
+    let cx=0,cy=0; cur.polygon.forEach(p=>{cx+=p.x;cy+=p.y;});
+    cx/=cur.polygon.length; cy/=cur.polygon.length;
+    cur.label={x:Math.round(cx), y:Math.round(cy)};
+  }
+  cur._draft=[]; draw();
+});
+document.getElementById("export").addEventListener("click",()=>{
+  const out=lots.map(L=>{const c={...L}; delete c._draft; return c;});
+  const js="/* Datos de lotes (exportado) */\nconst LOTES = "+JSON.stringify(out,null,2)+";\n";
+  const blob=new Blob([js],{type:"application/javascript"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="lotes.js"; a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+function fillSelect(){
+  const sel=document.getElementById("lotSelect");
+  sel.innerHTML="";
+  lots.forEach(L=>{const o=document.createElement("option"); o.value=L.id; o.textContent=`${L.id} (Manzana ${L.manzana})`; sel.appendChild(o);});
+  currentId=lots[0]?.id||null; sel.value=currentId;
+  document.getElementById("status").value=lots.find(x=>x.id===currentId)?.status||"disponible";
+}
+document.getElementById("lotSelect").addEventListener("change",(e)=>{
+  currentId=e.target.value;
+  document.getElementById("status").value=lots.find(x=>x.id===currentId)?.status||"disponible";
+  draw();
+});
+document.getElementById("status").addEventListener("change",(e)=>{lots.find(x=>x.id===currentId).status=e.target.value; draw();});
+
+img.onload=()=>{fillSelect(); resize(); fitToScreen();};
+resize();
+</script>
+</body></html>
