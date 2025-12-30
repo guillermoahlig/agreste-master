@@ -6,22 +6,17 @@
   <title>Masterplan interactivo - Agreste</title>
   <style>
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#fff}
-    .wrap{display:grid;grid-template-columns:1fr 280px;height:100vh}
+    .wrap{display:grid;grid-template-columns:1fr 380px;height:100vh}
     /* ✅ Sin borde negro + fondo claro */
-    .stage{background:#ffffff;overflow:hidden;position:relative;user-select:none;-webkit-user-select:none}
-    canvas{display:block;width:100%;height:100%;cursor:grab}
-    canvas.dragging{cursor:grabbing}
-    .panel{background:#fff;border-left:1px solid #e7e7e7;padding:12px;overflow:auto}
+    .stage{background:#ffffff;overflow:hidden}
+    canvas{display:block;width:100%;height:100%}
+    .panel{background:#fff;border-left:1px solid #e7e7e7;padding:16px;overflow:auto}
     .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:10px}
-    input,select,button{padding:10px;border:1px solid #ddd;border-radius:10px;font-size:14px;transition:all 0.2s}
-    input,select{flex:1} 
-    button{background:#fff;cursor:pointer}
-    button:hover{background:#f3f3f3;border-color:#999}
-    button:active{transform:scale(0.95)}
-    button.zoom-btn{padding:8px 12px;font-size:16px;font-weight:600;min-width:40px}
+    input,select,button{padding:10px;border:1px solid #ddd;border-radius:10px;font-size:14px}
+    input,select{flex:1} button{background:#fff;cursor:pointer}
     .pill{display:inline-block;padding:4px 10px;border-radius:999px;background:#f3f3f3;font-size:12px;margin-right:6px}
-    .muted{color:#6b7280;font-size:11px}
-    .kv{display:grid;grid-template-columns:100px 1fr;gap:6px;font-size:13px;margin-top:8px}
+    .muted{color:#6b7280;font-size:12px}
+    .kv{display:grid;grid-template-columns:110px 1fr;gap:8px;font-size:14px;margin-top:10px}
     .kv div:first-child{color:#6b7280}
     .warn{background:#fff7ed;border:1px solid #fed7aa;padding:10px;border-radius:12px;margin-top:12px;font-size:12px;color:#7c2d12}
   
@@ -31,23 +26,11 @@
     .feature .label{font-size:13px;color:#111827}
     .feature .subtle{color:#6b7280}
 
-    .zoom-controls{position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;gap:6px;background:white;padding:8px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);z-index:100}
-    .zoom-level{position:absolute;bottom:80px;right:20px;background:white;padding:8px 12px;border-radius:6px;font-size:12px;font-weight:600;color:#333;box-shadow:0 2px 8px rgba(0,0,0,0.1);z-index:100}
-    h2{font-size:18px !important;margin:0 0 4px 0 !important}
-
   </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="stage">
-    <canvas id="c"></canvas>
-    <div class="zoom-level" id="zoomLevel">Zoom: 100%</div>
-    <div class="zoom-controls">
-      <button class="zoom-btn" id="zoomIn" title="Zoom in (+ or scroll up)">+</button>
-      <button class="zoom-btn" id="zoomReset" title="Reset zoom (0)">⬜</button>
-      <button class="zoom-btn" id="zoomOut" title="Zoom out (- or scroll down)">−</button>
-    </div>
-  </div>
+  <div class="stage"><canvas id="c"></canvas></div>
   <div class="panel">
     <div class="toolbar">
       <input id="search" placeholder="Buscar lote (ej: P01)"/>
@@ -66,7 +49,7 @@
     <div id="info">
       <h2 style="margin:0 0 6px 0">Seleccioná un lote</h2>
       <div class="muted">Buscá por código y presioná Enter, o hacé clic cuando el lote tenga polígono.</div>
-      <div class="warn"><b>Controles:</b> Rueda para zoom • Clic+arrastrar para mover • Botones + − ⬜ para zoom • Teclado: +/−/0</div>
+      <div class="warn"><b>Tip:</b> hacé clic sobre un lote para ver su información. También podés buscar por código (ej. P01).</div>
     </div>
 
     <div class="muted" style="margin-top:14px">Zoom: rueda • Arrastrar: click y arrastrar</div>
@@ -84,19 +67,6 @@ let selectedId=null, hoveredId=null;
 let scale=1, offsetX=0, offsetY=0, dragging=false, drag={sx:0,sy:0,ox:0,oy:0};
 
 const colors={disponible:"rgba(34,197,94,0.18)",reservado:"rgba(234,179,8,0.20)",vendido:"rgba(239,68,68,0.18)",default:"rgba(59,130,246,0.16)"};
-
-// Configuración de zoom mejorada
-const ZOOM_CONFIG = {
-  min: 0.2,
-  max: 15,
-  wheelSensitivity: 0.15, // Más sensible
-  zoomStep: 1.25 // Botones de zoom
-};
-
-function updateZoomDisplay() {
-  const percent = Math.round(scale * 100);
-  document.getElementById("zoomLevel").textContent = `Zoom: ${percent}%`;
-}
 
 
 const FEATURE_DEFS = {
@@ -185,7 +155,6 @@ function fitToScreen(){
   scale=Math.min(sx,sy)*pad;
   offsetX=(st.width - img.width*scale)/2;
   offsetY=(st.height - img.height*scale)/2;
-  updateZoomDisplay();
   draw();
 }
 
@@ -304,7 +273,7 @@ canvas.addEventListener("mousemove",(e)=>{
   const r=canvas.getBoundingClientRect();
   const id=findLotAt(e.clientX-r.left, e.clientY-r.top);
   hoveredId=id;
-  canvas.style.cursor=id?"pointer":(dragging?"grabbing":"grab");
+  canvas.style.cursor=id?"pointer":(dragging?"grabbing":"default");
   draw();
 });
 canvas.addEventListener("click",(e)=>{
@@ -313,51 +282,22 @@ canvas.addEventListener("click",(e)=>{
   if(id) setSelected(id);
 });
 
-canvas.addEventListener("mousedown",(e)=>{ dragging=true; drag={sx:e.clientX,sy:e.clientY,ox:offsetX,oy:offsetY}; canvas.classList.add("dragging"); });
-window.addEventListener("mouseup",()=>{ dragging=false; canvas.classList.remove("dragging"); });
+canvas.addEventListener("mousedown",(e)=>{ dragging=true; drag={sx:e.clientX,sy:e.clientY,ox:offsetX,oy:offsetY}; });
+window.addEventListener("mouseup",()=> dragging=false);
 window.addEventListener("mousemove",(e)=>{ if(!dragging) return; offsetX=drag.ox+(e.clientX-drag.sx); offsetY=drag.oy+(e.clientY-drag.sy); draw(); });
 
-// Zoom mejorado con rueda del ratón
 canvas.addEventListener("wheel",(e)=>{
   e.preventDefault();
   const r=canvas.getBoundingClientRect();
   const mx=e.clientX-r.left, my=e.clientY-r.top;
   const before=toWorld(mx,my);
-  const factor = Math.exp(-e.deltaY * ZOOM_CONFIG.wheelSensitivity / 100);
-  scale=Math.max(ZOOM_CONFIG.min, Math.min(ZOOM_CONFIG.max, scale*factor));
+  const factor=(e.deltaY>0)?0.9:1.1;
+  scale=Math.max(0.2, Math.min(12, scale*factor));
   const after=toWorld(mx,my);
   offsetX += (after.x-before.x)*scale;
   offsetY += (after.y-before.y)*scale;
-  updateZoomDisplay();
   draw();
 },{passive:false});
-
-// Botones de zoom
-function zoomTo(factor, centerX, centerY) {
-  const r = canvas.getBoundingClientRect();
-  const mx = centerX ?? r.width / 2;
-  const my = centerY ?? r.height / 2;
-  const before = toWorld(mx, my);
-  scale = Math.max(ZOOM_CONFIG.min, Math.min(ZOOM_CONFIG.max, scale * factor));
-  const after = toWorld(mx, my);
-  offsetX += (after.x - before.x) * scale;
-  offsetY += (after.y - before.y) * scale;
-  updateZoomDisplay();
-  draw();
-}
-
-document.getElementById("zoomIn").addEventListener("click", () => zoomTo(ZOOM_CONFIG.zoomStep));
-document.getElementById("zoomOut").addEventListener("click", () => zoomTo(1 / ZOOM_CONFIG.zoomStep));
-document.getElementById("zoomReset").addEventListener("click", fitToScreen);
-
-// Atajos de teclado
-window.addEventListener("keydown", (e) => {
-  if(e.target.tagName === "INPUT") return;
-  if(e.key === "+") { e.preventDefault(); zoomTo(ZOOM_CONFIG.zoomStep); }
-  else if(e.key === "-") { e.preventDefault(); zoomTo(1 / ZOOM_CONFIG.zoomStep); }
-  else if(e.key === "0") { e.preventDefault(); fitToScreen(); }
-  else if(e.key === "Escape") setSelected(null);
-});
 
 document.getElementById("fit").addEventListener("click", fitToScreen);
 document.getElementById("filter").addEventListener("change", draw);
@@ -373,10 +313,8 @@ document.getElementById("openAnnot").addEventListener("click",()=> window.open("
 img.onload=()=>{
   resize();
   fitToScreen(); // ✅ mostrar TODO al cargar
-  updateZoomDisplay();
 };
 resize();
-updateZoomDisplay();
 </script>
 </body>
 </html>
