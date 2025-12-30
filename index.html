@@ -334,7 +334,7 @@
       const pad = 1.0; // sin margen para llenar completamente
       const sx = st.width / img.width;
       const sy = st.height / img.height;
-      scale = Math.max(sx, sy) * pad; // Usar max para llenar sin espacios laterales
+      scale = Math.min(sx, sy) * pad;
       offsetX = (st.width - img.width * scale) / 2;
       offsetY = (st.height - img.height * scale) / 2;
       updateZoomDisplay();
