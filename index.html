@@ -331,7 +331,7 @@
     function fitToScreen() {
       const st = stageRect();
       if (!img.complete) return;
-      const pad = 1.0; // sin margen para llenar completamente
+      const pad = 0.97; // pequeño margen
       const sx = st.width / img.width;
       const sy = st.height / img.height;
       scale = Math.min(sx, sy) * pad;
